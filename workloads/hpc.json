@@ -1,0 +1,24 @@
+{
+    "description": "This workload is part of those which have been generated to conduct the experiments described in Batsim's JSSPP article. More information about how it has been generated can be found in the article and on the Batsim Experiments github page (https://github.com/oar-team/batsim-experiments)",
+    "command": "translate_submission_times.py -i 4 -w generated_workloads/2016-05-04/g5k_workload_delay_seed1_size32.json",
+    "date": "2016-05-17 10:28:31.851083",
+    "jobs": [
+        {
+            "id": 1,
+            "profile": "delay_ft.B.1",
+            "res": 16,
+            "subtime": 1968,
+            "walltime": 4000
+        }
+   ],
+    "nb_res": 32,
+    "profiles": {
+        "delay_ft.B.1": {
+            "command": "mpirun --mca btl self,sm,tcp -hostfile \\$OAR_NODEFILE --path $PATH ft.B.1",
+            "delay": 1843.0,
+            "np": 1,
+            "runtime": 1843.0,
+            "type": "delay"
+        }
+    }
+}
