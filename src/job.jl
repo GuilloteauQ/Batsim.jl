@@ -2,7 +2,7 @@
 @enum JobState UNKNOWN IN_SUBMISSON SUBMITTED RUNNING COMPLETED_SUCCESSFULLY COMPLETED_FAILED COMPLETED_WALLTIME_REACHED COMPLETED_KILLED REJECTED IN_KILLING
 
 mutable struct Job
-    job_id::Integer
+    job_id::String
     submit_time::Number
     requested_time::Number
     requested_resources::Integer
