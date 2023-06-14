@@ -7,8 +7,8 @@
             "id": 1,
             "profile": "delay_ft.B.1",
             "res": 16,
-            "subtime": 1968,
-            "walltime": 4000
+            "subtime": 1,
+            "walltime": 40
         }
    ],
     "nb_res": 32,
