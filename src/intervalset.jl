@@ -1,6 +1,7 @@
 using IterTools
 
 struct Interval
+  # [start, finish[
   start
   finish
 
@@ -14,6 +15,8 @@ get_inf(interval::Interval) = interval.start
 get_sup(interval::Interval) = interval.finish
 is_valid(interval::Interval) = (interval.start <= interval.finish)
 range(interval::Interval) = interval.start == interval.finish ? [interval.start] : [interval.start, interval.finish] 
+Base.:(==)(interval_left::Interval, interval_right::Interval) = interval_left.start == interval_right.start && interval_left.finish == interval_right.finish
+Base.:(!=)(interval_left::Interval, interval_right::Interval) = interval_left.start != interval_right.start || interval_left.finish != interval_right.finish
 
 struct IntervalSet
   intervals::Vector{Interval}
@@ -23,6 +26,9 @@ to_intervalset(interval::Interval) = IntervalSet([interval])
 is_empty(interval_set::IntervalSet) = Base.length(interval_set.intervals) == 0
 length(interval_set::IntervalSet) = map(x -> length(x), interval_set.intervals) |> sum
 max(interval_set::IntervalSet) = maximum(length, interval_set.intervals; init=0)
+nb_intervals(interval_set::IntervalSet) = Base.length(interval_set.intervals)
+Base.:(==)(is_left::IntervalSet, is_right::IntervalSet) = (nb_intervals(is_left) == nb_intervals(is_right)) && (zip(is_left.intervals, is_right.intervals) |> y -> map(x-> x[1]==x[2], y) |> all)
+# Base.:(!=)(is_left::IntervalSet, is_right::IntervalSet) = zip(is_left.intervals, is_right.intervals) |> y -> map(x-> x[1]!=x[2], y) |> any
 
 function get_sup(interval_set)
   if is_empty(interval_set)
@@ -89,22 +95,22 @@ function merge(left_is, right_is, op)
 
   sentinel = maximum((get_sup(left_is), get_sup(right_is))) + 1
 
-  flat_left_is  = enumerate(chain(flatten_iter(left_is),  [sentinel]))
-  flat_right_is = enumerate(chain(flatten_iter(right_is), [sentinel]))
+  flat_left_is  = flatten_vec(left_is)
+  flat_right_is = flatten_vec(right_is)
+  flat_left_is = push!(flat_left_is, sentinel)
+  flat_right_is = push!(flat_right_is, sentinel)
+  println(flat_left_is)
+  println(flat_right_is)
 
   result = []
-  
-  scan = minimum((get_inf(left_is), get_inf(right_is)))
 
-  iter_left = iterate(flat_left_is)
-  iter_right = iterate(flat_left_is)
-
-  (left_index, left_element),   state_left  = iter_left
-  (right_index, right_element), state_right = iter_right
+  left_index = 1
+  right_index = 1
+  scan = minimum((flat_left_is[left_index], flat_right_is[right_index]))
 
   while scan < sentinel
-    is_in_left  = !((scan < left_element)  ^ (left_index % 2 == 0))
-    is_in_right = !((scan < right_element) ^ (right_index % 2 == 0))
+    is_in_left  = !((scan < flat_left_is[left_index])   ^ (left_index % 2 == 1))
+    is_in_right = !((scan < flat_right_is[right_index]) ^ (right_index % 2 == 1))
 
     is_in_result = op(is_in_left, is_in_right)
 
@@ -112,12 +118,13 @@ function merge(left_is, right_is, op)
       push!(result, scan)
     end
 
-    if scan == left_element
-        (left_index, left_element), state_left    = iterate(flat_left_is, state_left)
-    else
-        (right_index, right_element), state_right = iterate(flat_right_is, state_right)
+    if scan == flat_left_is[left_index]
+      left_index += 1
     end
-    scan = minimum((left_element, right_element))
+    if scan == flat_right_is[right_index]
+      right_index += 1
+    end
+    scan = minimum((flat_left_is[left_index], flat_right_is[right_index]))
   end
   unflatten(result)
 end
@@ -137,6 +144,13 @@ end
 using Test
 
 @testset "Interval" begin
+  @testset "Interval-eq" begin
+    @test Interval(0, 1) == Interval(0, 1)
+    @test Interval(0, 0) == Interval(0)
+    @test Interval([0, 1]) == Interval(0, 1)
+    @test Interval(0, 0) != Interval(0, 1)
+  end
+
   @testset "Interval-length" begin
     @test length(Interval(0, 0)) == 1
     @test length(Interval(0)) == 1
@@ -166,4 +180,44 @@ end
     @test length(IntervalSet([Interval(0, 0), Interval(2, 2)])) == 2
   end
 
+  @testset "IntervalSet-eq" begin
+    @test IntervalSet([]) == IntervalSet([])
+    @test IntervalSet([Interval(0, 0)]) != IntervalSet([])
+    @test IntervalSet([Interval(0, 0)]) != IntervalSet([Interval(0, 1)])
+    @test IntervalSet([Interval(0, 0)]) == IntervalSet([Interval(0, 0)])
+    @test IntervalSet([Interval(0, 0), Interval(1, 1)]) != IntervalSet([Interval(0, 0)])
+  end
+
+  @testset "IntervalSet-flatten" begin
+    @test flatten_vec(IntervalSet([Interval(0, 1), Interval(5, 9)])) == [0, 1, 5, 9] 
+    @test flatten_vec(IntervalSet([Interval(0, 0), Interval(5, 9)])) == [0, 0, 5, 9] 
+  end
+
+  @testset "IntervalSet-unflatten" begin
+    @test IntervalSet([Interval(0, 1), Interval(5, 9)]) == unflatten([0, 1, 5, 9])
+    @test IntervalSet([Interval(0, 0), Interval(5, 9)]) == unflatten([0, 0, 5, 9])
+  end
+
+  @testset "IntervalSet-empty" begin
+    @test !is_empty(IntervalSet([Interval(0, 0)]))
+    @test is_empty(IntervalSet([]))
+  end
+
+  @testset "IntevalSet-merge-union" begin
+    @test 1 == 1
+  end
+
+  @testset "IntevalSet-merge-diff" begin
+    @test interval_diff(IntervalSet([Interval(5, 10)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([])
+    @test interval_diff(IntervalSet([Interval(0, 100)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([Interval(0, 4), Interval(11, 14), Interval(21, 100)])
+    @test interval_diff(IntervalSet([]), IntervalSet([])) == IntervalSet([])
+  end
+
+  @testset "IntevalSet-merge-intersect" begin
+    @test interval_intersect(IntervalSet([Interval(5, 10)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([Interval(5, 10)])
+    @test interval_intersect(IntervalSet([]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([])
+    @test interval_intersect(IntervalSet([Interval(5, 10), Interval(15, 20)]), IntervalSet([])) == IntervalSet([])
+    @test interval_intersect(IntervalSet([Interval(0, 100)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([Interval(5, 10), Interval(15, 20)])
+    @test interval_intersect(IntervalSet([]), IntervalSet([])) == IntervalSet([])
+  end
 end
