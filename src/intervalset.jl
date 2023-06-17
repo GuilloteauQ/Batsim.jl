@@ -10,7 +10,7 @@ struct Interval
   Interval(x, y) = new(x, y)
 end
 
-length(interval::Interval) = interval.finish - interval.start + 1
+Base.:(length)(interval::Interval) = interval.finish - interval.start + 1
 get_inf(interval::Interval) = interval.start
 get_sup(interval::Interval) = interval.finish
 is_valid(interval::Interval) = (interval.start <= interval.finish)
@@ -23,10 +23,10 @@ struct IntervalSet
 end
 
 to_intervalset(interval::Interval) = IntervalSet([interval])
-is_empty(interval_set::IntervalSet) = Base.length(interval_set.intervals) == 0
-length(interval_set::IntervalSet) = map(x -> length(x), interval_set.intervals) |> sum
+is_empty(interval_set::IntervalSet) = length(interval_set.intervals) == 0
+Base.:(length)(interval_set::IntervalSet) = map(x -> length(x), interval_set.intervals) |> sum
 max(interval_set::IntervalSet) = maximum(length, interval_set.intervals; init=0)
-nb_intervals(interval_set::IntervalSet) = Base.length(interval_set.intervals)
+nb_intervals(interval_set::IntervalSet) = length(interval_set.intervals)
 Base.:(==)(is_left::IntervalSet, is_right::IntervalSet) = (nb_intervals(is_left) == nb_intervals(is_right)) && (zip(is_left.intervals, is_right.intervals) |> y -> map(x-> x[1]==x[2], y) |> all)
 # Base.:(!=)(is_left::IntervalSet, is_right::IntervalSet) = zip(is_left.intervals, is_right.intervals) |> y -> map(x-> x[1]!=x[2], y) |> any
 
@@ -114,7 +114,7 @@ function merge(left_is, right_is, op)
 
     is_in_result = op(is_in_left, is_in_right)
 
-    if is_in_result ^ (Base.length(result) % 2 == 0)
+    if is_in_result ^ (Base.length(result) % 2 != 0)
       push!(result, scan)
     end
 
