@@ -29,8 +29,10 @@ mutable struct Batsim
     profiles
     workloads
     jobs
+    scheduler
+    events_to_send
 
-    Batsim() = new(BatsimSocket(), 0.0, false, 0, nothing, nothing, nothing)
+    Batsim() = new(BatsimSocket(), 0.0, false, 0, nothing, nothing, nothing, nothing, [])
 end
 
 function init_batsim(batsim)
@@ -38,6 +40,9 @@ function init_batsim(batsim)
     batsim.jobs = Dict()
 end
 
+function set_scheduler!(batsim, sched)
+    batsim.scheduler = sched
+end
 
 function time(batsim)
     batsim.current_time
@@ -46,6 +51,7 @@ end
 function next_event!(batsim)
     message = recv_message(batsim.socket)
     batsim.current_time = message["now"]
+    batsim.events_to_send = []
     
     for event in message["events"]
         event_type = event["type"]
@@ -61,7 +67,7 @@ function next_event!(batsim)
         end
     end
 
-    data = Dict("now" => time(batsim), "events" => [])
+    data = Dict("now" => time(batsim), "events" => batsim.events_to_send)
     send_message(batsim.socket, data)  
 end
 
@@ -80,6 +86,7 @@ function manage_event_job_submitted!(batsim, data)
     batsim.jobs[job_id] = new_job
 
     # TODO notify the sched
+    on_job_submission(batsim.scheduler, new_job)
 end
 
 function manage_event_simulation_begins!(batsim, data)
@@ -97,5 +104,23 @@ function manage_event_simulation_ends!(batsim)
     @assert batsim.simulation_is_running
     batsim.simulation_is_running = false
 end
+
+function reject_jobs_by_ids!(batsim, job_ids)
+    for job_id in job_ids
+        event = Dict(
+            "timestamp" => time(batsim),
+            "type" => "REJECT_JOB",
+            "data" => Dict("job_id" => job_id)
+        )
+        push!(batsim.events_to_send, event)
+        # TODO change job state
+    end
+end
+
+function reject_jobs(batsim, jobs)
+    reject_jobs_by_ids!(batsim, jobs .|> x -> x.job_id)
+end
+
+
 
 

@@ -1,15 +1,13 @@
 include("socket.jl")
 include("batsim.jl")
+include("batsim_scheduler.jl")
 
 function main()
-  # socket = BatsimSocket()
-  # init_socket(socket)
-  # data = recv_message(socket)
-  # println(data)
-  # close_socket(socket)
-
   batsim = Batsim()
   init_batsim(batsim)
+  bat_sched = BatsimScheduler(batsim)
+  set_scheduler!(batsim, bat_sched)
+
   while true
     next_event!(batsim)
     println("recv")
