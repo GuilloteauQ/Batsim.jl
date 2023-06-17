@@ -49,16 +49,16 @@ end
 
 function flatten_vec(interval_set)
   # map(x -> range(x), interval_set.intervals) |> Iterators.flatten |> collect
-  map(x -> (get_inf(x), get_sup(x)), interval_set.intervals) |> Iterators.flatten |> collect
+  map(x -> (get_inf(x), get_sup(x) + 1), interval_set.intervals) |> Iterators.flatten |> collect
 end
 
 function flatten_iter(interval_set)
   # map(x -> range(x), interval_set.intervals) |> Iterators.flatten
-  map(x -> (get_inf(x), get_sup(x)), interval_set.intervals) |> Iterators.flatten
+  map(x -> (get_inf(x), get_sup(x)) + 1, interval_set.intervals) |> Iterators.flatten
 end
 
 function unflatten(point_list)
-  intervals = partition(point_list, 2) .|>  x -> Interval(x)
+  intervals = partition(point_list, 2) .|>  x -> Interval(x[1], x[2] - 1)
   IntervalSet(intervals)
 end
 
@@ -93,28 +93,26 @@ function merge(left_is, right_is, op)
     return left_is
   end
 
-  sentinel = maximum((get_sup(left_is), get_sup(right_is))) + 1
 
   flat_left_is  = flatten_vec(left_is)
   flat_right_is = flatten_vec(right_is)
+  sentinel = maximum((get_sup(left_is), get_sup(right_is))) + 2
   flat_left_is = push!(flat_left_is, sentinel)
   flat_right_is = push!(flat_right_is, sentinel)
-  println(flat_left_is)
-  println(flat_right_is)
 
   result = []
 
+  scan = minimum((flat_left_is[1], flat_right_is[1]))
   left_index = 1
   right_index = 1
-  scan = minimum((flat_left_is[left_index], flat_right_is[right_index]))
 
   while scan < sentinel
-    is_in_left  = !((scan < flat_left_is[left_index])   ^ (left_index % 2 == 1))
-    is_in_right = !((scan < flat_right_is[right_index]) ^ (right_index % 2 == 1))
+    is_in_left  = !(xor(scan < flat_left_is[left_index], left_index % 2 != 1))
+    is_in_right = !(xor(scan < flat_right_is[right_index], right_index % 2 != 1))
 
     is_in_result = op(is_in_left, is_in_right)
 
-    if is_in_result ^ (Base.length(result) % 2 != 0)
+    if xor(is_in_result, length(result) % 2 != 0)
       push!(result, scan)
     end
 
@@ -189,13 +187,13 @@ end
   end
 
   @testset "IntervalSet-flatten" begin
-    @test flatten_vec(IntervalSet([Interval(0, 1), Interval(5, 9)])) == [0, 1, 5, 9] 
-    @test flatten_vec(IntervalSet([Interval(0, 0), Interval(5, 9)])) == [0, 0, 5, 9] 
+    @test flatten_vec(IntervalSet([Interval(0, 10), Interval(15, 20)])) == [0, 11, 15, 21] 
+    @test flatten_vec(IntervalSet([Interval(0, 10)])) == [0, 11] 
   end
 
   @testset "IntervalSet-unflatten" begin
-    @test IntervalSet([Interval(0, 1), Interval(5, 9)]) == unflatten([0, 1, 5, 9])
-    @test IntervalSet([Interval(0, 0), Interval(5, 9)]) == unflatten([0, 0, 5, 9])
+    @test IntervalSet([Interval(0, 10), Interval(15, 20)]) == unflatten([0, 11, 15, 21])
+    @test IntervalSet([Interval(0, 10)]) == unflatten([0, 11])
   end
 
   @testset "IntervalSet-empty" begin
@@ -204,7 +202,12 @@ end
   end
 
   @testset "IntevalSet-merge-union" begin
-    @test 1 == 1
+    @test interval_union(IntervalSet([Interval(5, 10)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([Interval(5, 10), Interval(15, 20)])
+    @test interval_union(IntervalSet([Interval(5, 10), Interval(15, 20)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([Interval(5, 10), Interval(15, 20)])
+    @test interval_union(IntervalSet([Interval(5, 10), Interval(15, 20)]), IntervalSet([])) == IntervalSet([Interval(5, 10), Interval(15, 20)])
+    @test interval_union(IntervalSet([Interval(0, 100)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([Interval(0, 100)])
+    @test interval_union(IntervalSet([Interval(0, 0), Interval(2, 2), Interval(3, 3)]), IntervalSet([Interval(1, 1)])) == IntervalSet([Interval(0, 3)])
+    @test interval_union(IntervalSet([]), IntervalSet([])) == IntervalSet([])
   end
 
   @testset "IntevalSet-merge-diff" begin
