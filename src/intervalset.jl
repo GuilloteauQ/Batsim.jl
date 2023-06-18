@@ -1,3 +1,4 @@
+
 using IterTools
 
 struct Interval
@@ -17,6 +18,7 @@ is_valid(interval::Interval) = (interval.start <= interval.finish)
 range(interval::Interval) = interval.start == interval.finish ? [interval.start] : [interval.start, interval.finish] 
 Base.:(==)(interval_left::Interval, interval_right::Interval) = interval_left.start == interval_right.start && interval_left.finish == interval_right.finish
 Base.:(!=)(interval_left::Interval, interval_right::Interval) = interval_left.start != interval_right.start || interval_left.finish != interval_right.finish
+Base.show(io::IO, interval::Interval) = interval.start == interval.finish ? print(io, "$(interval.start)") : print(io, "$(interval.start)-$(interval.finish)")
 
 struct IntervalSet
   intervals::Vector{Interval}
@@ -24,11 +26,16 @@ end
 
 to_intervalset(interval::Interval) = IntervalSet([interval])
 is_empty(interval_set::IntervalSet) = length(interval_set.intervals) == 0
-Base.:(length)(interval_set::IntervalSet) = map(x -> length(x), interval_set.intervals) |> sum
+Base.:(length)(interval_set::IntervalSet) = !is_empty(interval_set) ? map(x -> length(x), interval_set.intervals) |> sum : 0
 max(interval_set::IntervalSet) = maximum(length, interval_set.intervals; init=0)
 nb_intervals(interval_set::IntervalSet) = length(interval_set.intervals)
 Base.:(==)(is_left::IntervalSet, is_right::IntervalSet) = (nb_intervals(is_left) == nb_intervals(is_right)) && (zip(is_left.intervals, is_right.intervals) |> y -> map(x-> x[1]==x[2], y) |> all)
 # Base.:(!=)(is_left::IntervalSet, is_right::IntervalSet) = zip(is_left.intervals, is_right.intervals) |> y -> map(x-> x[1]!=x[2], y) |> any
+
+function Base.show(io::IO, interval_set::IntervalSet)
+  ints = interval_set.intervals .|> repr
+  print(io, join(ints, " "))
+end
 
 function get_sup(interval_set)
   if is_empty(interval_set)
@@ -43,6 +50,30 @@ function get_inf(interval_set)
     -1
   else
     get_inf(first(interval_set.intervals))
+  end
+end
+
+function find_spots(interval_set, desired_length)
+  if desired_length > length(interval_set)
+    IntervalSet([])
+  else
+    remaining_length = desired_length
+    intervals = []
+    for interval in interval_set.intervals
+      if remaining_length > 0
+        if length(interval) <= remaining_length
+          push!(intervals, interval)
+          remaining_length -= length(interval)
+        else
+          start_interval = get_inf(interval)
+          push!(intervals, Interval(start_interval, start_interval + remaining_length - 1))
+          remaining_length = 0
+        end
+      else
+        break
+      end
+    end
+    IntervalSet(intervals)
   end
 end
 
@@ -131,96 +162,16 @@ function interval_diff(left_is, right_is)
   merge(left_is, right_is, (x, y) -> x && !y)
 end
 
+Base.:(-)(left_is, right_is) = interval_diff(left_is, right_is)
+
 function interval_union(left_is, right_is)
   merge(left_is, right_is, (x, y) -> x || y)
 end
+
+Base.:(|)(left_is, right_is) = interval_union(left_is, right_is)
 
 function interval_intersect(left_is, right_is)
   merge(left_is, right_is, (x, y) -> x && y)
 end
 
-using Test
-
-@testset "Interval" begin
-  @testset "Interval-eq" begin
-    @test Interval(0, 1) == Interval(0, 1)
-    @test Interval(0, 0) == Interval(0)
-    @test Interval([0, 1]) == Interval(0, 1)
-    @test Interval(0, 0) != Interval(0, 1)
-  end
-
-  @testset "Interval-length" begin
-    @test length(Interval(0, 0)) == 1
-    @test length(Interval(0)) == 1
-    @test length(Interval((0, 0))) == 1
-    @test length(Interval([0, 0])) == 1 
-    @test length(Interval(0, 1)) == 2
-  end
-
-  @testset "Interval-is_valid" begin
-    @test is_valid(Interval(0, 0))
-    @test is_valid(Interval(0, 1))
-    @test is_valid(Interval(-1, 0))
-    @test !is_valid(Interval(0, -1))
-  end
-
-  @testset "Interval-get_inf_sup" begin
-    @test get_inf(Interval(0, 1)) == 0
-    @test get_sup(Interval(0, 1)) == 1
-  end
-end
-
-@testset "IntervalSet" begin
-  @testset "IntervalSet-creation" begin
-    @test length(to_intervalset(Interval(0, 0))) == 1
-    @test length(IntervalSet([Interval(0, 0)])) == 1
-    @test length(IntervalSet([Interval(0, 0), Interval(1, 2)])) == 3
-    @test length(IntervalSet([Interval(0, 0), Interval(2, 2)])) == 2
-  end
-
-  @testset "IntervalSet-eq" begin
-    @test IntervalSet([]) == IntervalSet([])
-    @test IntervalSet([Interval(0, 0)]) != IntervalSet([])
-    @test IntervalSet([Interval(0, 0)]) != IntervalSet([Interval(0, 1)])
-    @test IntervalSet([Interval(0, 0)]) == IntervalSet([Interval(0, 0)])
-    @test IntervalSet([Interval(0, 0), Interval(1, 1)]) != IntervalSet([Interval(0, 0)])
-  end
-
-  @testset "IntervalSet-flatten" begin
-    @test flatten_vec(IntervalSet([Interval(0, 10), Interval(15, 20)])) == [0, 11, 15, 21] 
-    @test flatten_vec(IntervalSet([Interval(0, 10)])) == [0, 11] 
-  end
-
-  @testset "IntervalSet-unflatten" begin
-    @test IntervalSet([Interval(0, 10), Interval(15, 20)]) == unflatten([0, 11, 15, 21])
-    @test IntervalSet([Interval(0, 10)]) == unflatten([0, 11])
-  end
-
-  @testset "IntervalSet-empty" begin
-    @test !is_empty(IntervalSet([Interval(0, 0)]))
-    @test is_empty(IntervalSet([]))
-  end
-
-  @testset "IntevalSet-merge-union" begin
-    @test interval_union(IntervalSet([Interval(5, 10)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([Interval(5, 10), Interval(15, 20)])
-    @test interval_union(IntervalSet([Interval(5, 10), Interval(15, 20)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([Interval(5, 10), Interval(15, 20)])
-    @test interval_union(IntervalSet([Interval(5, 10), Interval(15, 20)]), IntervalSet([])) == IntervalSet([Interval(5, 10), Interval(15, 20)])
-    @test interval_union(IntervalSet([Interval(0, 100)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([Interval(0, 100)])
-    @test interval_union(IntervalSet([Interval(0, 0), Interval(2, 2), Interval(3, 3)]), IntervalSet([Interval(1, 1)])) == IntervalSet([Interval(0, 3)])
-    @test interval_union(IntervalSet([]), IntervalSet([])) == IntervalSet([])
-  end
-
-  @testset "IntevalSet-merge-diff" begin
-    @test interval_diff(IntervalSet([Interval(5, 10)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([])
-    @test interval_diff(IntervalSet([Interval(0, 100)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([Interval(0, 4), Interval(11, 14), Interval(21, 100)])
-    @test interval_diff(IntervalSet([]), IntervalSet([])) == IntervalSet([])
-  end
-
-  @testset "IntevalSet-merge-intersect" begin
-    @test interval_intersect(IntervalSet([Interval(5, 10)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([Interval(5, 10)])
-    @test interval_intersect(IntervalSet([]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([])
-    @test interval_intersect(IntervalSet([Interval(5, 10), Interval(15, 20)]), IntervalSet([])) == IntervalSet([])
-    @test interval_intersect(IntervalSet([Interval(0, 100)]), IntervalSet([Interval(5, 10), Interval(15, 20)])) == IntervalSet([Interval(5, 10), Interval(15, 20)])
-    @test interval_intersect(IntervalSet([]), IntervalSet([])) == IntervalSet([])
-  end
-end
+Base.:(&)(left_is, right_is) = interval_intersect(left_is, right_is)

@@ -35,6 +35,8 @@ mutable struct Batsim
     Batsim() = new(BatsimSocket(), 0.0, false, 0, nothing, nothing, nothing, nothing, [])
 end
 
+get_nb_compute_resources(batsim) = batsim.nb_resources
+
 function init_batsim(batsim)
     init_socket(batsim.socket)
     batsim.jobs = Dict()
@@ -69,8 +71,11 @@ function next_event!(batsim)
         end
     end
 
+    on_no_more_events!(batsim.scheduler)
+
     data = Dict("now" => time(batsim), "events" => batsim.events_to_send)
     send_message(batsim.socket, data)  
+
 end
 
 function manage_event_notify!(batsim, data)
@@ -94,7 +99,6 @@ function manage_event_job_submitted!(batsim, data)
     # TODO store profile if new
     batsim.jobs[job_id] = new_job
 
-    # TODO notify the sched
     on_job_submission!(batsim.scheduler, new_job)
 end
 
@@ -103,10 +107,11 @@ function manage_event_simulation_begins!(batsim, data)
     @assert !batsim.simulation_is_running
     batsim.simulation_is_running = true
     batsim.nb_resources = data["nb_resources"]
+    println(batsim.nb_resources)
     batsim.workloads = data["workloads"]
     batsim.profiles = data["profiles"]
 
-    # TODO notify the sched
+    on_simulation_begins!(batsim.scheduler)
 end
 
 function manage_event_simulation_ends!(batsim)
@@ -138,7 +143,7 @@ function execute_job(batsim, job)
         "type" => "EXECUTE_JOB",
         "data" => Dict(
                 "job_id" => job.job_id,
-                "alloc" => job.allocation
+                "alloc" => repr(job.allocation)
         )
     )
 
