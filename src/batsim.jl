@@ -62,6 +62,8 @@ function next_event!(batsim)
             manage_event_simulation_ends!(batsim)
         elseif event_type == "JOB_SUBMITTED"
             manage_event_job_submitted!(batsim, event["data"])
+        elseif event_type == "JOB_COMPLETED"
+            manage_event_job_complete!(batsim, event["data"])
         elseif event_type == "NOTIFY"
             manage_event_notify!(batsim, event["data"])
         end
@@ -78,6 +80,13 @@ function manage_event_notify!(batsim, data)
     end
 end
 
+function manage_event_job_complete!(batsim, data)
+    job_id = data["job_id"]
+    job = batsim.jobs[job_id]
+    job.finish_time = time(batsim)
+    on_job_completion!(batsim.scheduler, job)
+end
+
 function manage_event_job_submitted!(batsim, data)
     job_id = data["job_id"]
     job_data = data["job"]
@@ -86,7 +95,7 @@ function manage_event_job_submitted!(batsim, data)
     batsim.jobs[job_id] = new_job
 
     # TODO notify the sched
-    on_job_submission(batsim.scheduler, new_job)
+    on_job_submission!(batsim.scheduler, new_job)
 end
 
 function manage_event_simulation_begins!(batsim, data)
@@ -122,5 +131,28 @@ function reject_jobs(batsim, jobs)
 end
 
 
+
+function execute_job(batsim, job)
+    message = Dict(
+        "timestamp" => time(batsim),
+        "type" => "EXECUTE_JOB",
+        "data" => Dict(
+                "job_id" => job.job_id,
+                "alloc" => job.allocation
+        )
+    )
+
+    batsim.jobs[job.job_id].allocation = job.allocation
+    batsim.jobs[job.job_id].job_state = RUNNING
+    batsim.jobs[job.job_id].starting_time = time(batsim)
+
+    push!(batsim.events_to_send, message)
+end
+
+function execute_jobs(batsim, jobs)
+    for job in jobs
+        execute_job(batsim, job)
+    end
+end
 
 
