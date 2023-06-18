@@ -50,18 +50,28 @@ function time(batsim)
     batsim.current_time
 end
 
+function start(batsim)
+    init_batsim(batsim)
+    done_conversing = false
+    while !done_conversing
+        done_conversing = next_event!(batsim)
+    end
+    close_socket(batsim.socket)
+end
+
 function next_event!(batsim)
     message = recv_message(batsim.socket)
     batsim.current_time = message["now"]
     batsim.events_to_send = []
+    done_conversing = false
     
     for event in message["events"]
         event_type = event["type"]
-        println("EVENT: $event_type")
         if event_type == "SIMULATION_BEGINS"
             manage_event_simulation_begins!(batsim, event["data"])
         elseif event_type == "SIMULATION_ENDS"
             manage_event_simulation_ends!(batsim)
+            done_conversing = true
         elseif event_type == "JOB_SUBMITTED"
             manage_event_job_submitted!(batsim, event["data"])
         elseif event_type == "JOB_COMPLETED"
@@ -76,6 +86,7 @@ function next_event!(batsim)
     data = Dict("now" => time(batsim), "events" => batsim.events_to_send)
     send_message(batsim.socket, data)  
 
+    done_conversing
 end
 
 function manage_event_notify!(batsim, data)
@@ -107,7 +118,6 @@ function manage_event_simulation_begins!(batsim, data)
     @assert !batsim.simulation_is_running
     batsim.simulation_is_running = true
     batsim.nb_resources = data["nb_resources"]
-    println(batsim.nb_resources)
     batsim.workloads = data["workloads"]
     batsim.profiles = data["profiles"]
 
