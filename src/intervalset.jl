@@ -3,10 +3,10 @@ using IterTools
 
 struct Interval
   # [start, finish[
-  start
-  finish
+  start::Int64
+  finish::Int64
 
-  Interval(x::Real) = new(x, x)
+  # Interval(x) = new(x, x)
   Interval(x) = new(x[1], x[2])
   Interval(x, y) = new(x, y)
 end
@@ -18,7 +18,8 @@ is_valid(interval::Interval) = (interval.start <= interval.finish)
 range(interval::Interval) = interval.start == interval.finish ? [interval.start] : [interval.start, interval.finish] 
 Base.:(==)(interval_left::Interval, interval_right::Interval) = interval_left.start == interval_right.start && interval_left.finish == interval_right.finish
 Base.:(!=)(interval_left::Interval, interval_right::Interval) = interval_left.start != interval_right.start || interval_left.finish != interval_right.finish
-Base.show(io::IO, interval::Interval) = interval.start == interval.finish ? print(io, "$(interval.start)") : print(io, "$(interval.start)-$(interval.finish)")
+# Base.show(io::IO, interval::Interval) = interval.start == interval.finish ? print(io, "$(interval.start)") : print(io, "$(interval.start)-$(interval.finish)")
+Base.show(io::IO, interval::Interval) = print(io, "$(interval.start)-$(interval.finish)")
 
 struct IntervalSet
   intervals::Vector{Interval}
@@ -26,15 +27,15 @@ end
 
 to_intervalset(interval::Interval) = IntervalSet([interval])
 is_empty(interval_set::IntervalSet) = length(interval_set.intervals) == 0
-Base.:(length)(interval_set::IntervalSet) = !is_empty(interval_set) ? map(x -> length(x), interval_set.intervals) |> sum : 0
+# Base.:(length)(interval_set::IntervalSet) = !is_empty(interval_set) ? map(x -> length(x), interval_set.intervals) |> sum : 0
+Base.:(length)(interval_set::IntervalSet) = sum(length, interval_set.intervals, init=0)
 max(interval_set::IntervalSet) = maximum(length, interval_set.intervals; init=0)
 nb_intervals(interval_set::IntervalSet) = length(interval_set.intervals)
 Base.:(==)(is_left::IntervalSet, is_right::IntervalSet) = (nb_intervals(is_left) == nb_intervals(is_right)) && (zip(is_left.intervals, is_right.intervals) |> y -> map(x-> x[1]==x[2], y) |> all)
 # Base.:(!=)(is_left::IntervalSet, is_right::IntervalSet) = zip(is_left.intervals, is_right.intervals) |> y -> map(x-> x[1]!=x[2], y) |> any
 
 function Base.show(io::IO, interval_set::IntervalSet)
-  ints = interval_set.intervals .|> repr
-  print(io, join(ints, " "))
+  interval_set.intervals |> x -> join(x, " ") |> x -> print(io, x)
 end
 
 function get_sup(interval_set)
@@ -53,7 +54,7 @@ function get_inf(interval_set)
   end
 end
 
-function find_spots(interval_set, desired_length)
+function find_spots(interval_set::IntervalSet, desired_length)::IntervalSet
   if desired_length > length(interval_set)
     IntervalSet([])
   else
@@ -85,39 +86,12 @@ end
 
 function flatten_iter(interval_set)
   # map(x -> range(x), interval_set.intervals) |> Iterators.flatten
-  map(x -> (get_inf(x), get_sup(x)) + 1, interval_set.intervals) |> Iterators.flatten
+  map(x -> (get_inf(x), get_sup(x) + 1), interval_set.intervals) |> Iterators.flatten
 end
 
 function unflatten(point_list)
-  intervals = partition(point_list, 2) .|>  x -> Interval(x[1], x[2] - 1)
-  IntervalSet(intervals)
+  IntervalSet(partition(point_list, 2) .|> x -> Interval(x[1], x[2]-1))
 end
-
- # pub fn insert(&mut self, element: Interval) {
- #        let mut newinf = element.0;
- #        let mut newsup = element.1;
-
- #        // Because we may remove one interval from self while we loop through its clone, we need to
- #        // adjuste the position.
- #        let mut idx_shift = 0;
- #        for (pos, intv) in self.intervals.clone().iter().enumerate() {
- #            if newinf > intv.1 + 1 {
- #                continue;
- #            }
- #            if newsup + 1 < intv.0 {
- #                break;
- #            }
-
- #            self.intervals.remove(pos - idx_shift);
- #            idx_shift += 1;
-
- #            newinf = cmp::min(newinf, intv.0);
- #            newsup = cmp::max(newsup, intv.1);
- #        }
- #        self.intervals.push(Interval::new(newinf, newsup));
- #        self.intervals.sort();
- #    }
-
 
 function merge(left_is, right_is, op)
   if is_empty(left_is) && is_empty(right_is)

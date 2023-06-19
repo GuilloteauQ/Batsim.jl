@@ -1,3 +1,4 @@
+include("intervalset.jl")
 
 @enum JobState UNKNOWN IN_SUBMISSION SUBMITTED RUNNING COMPLETED_SUCCESSFULLY COMPLETED_FAILED COMPLETED_WALLTIME_REACHED COMPLETED_KILLED REJECTED IN_KILLING
 
@@ -7,13 +8,13 @@ mutable struct Job
     requested_time::Number
     requested_resources::Integer
     profile::String
-    starting_time
-    finish_time
+    starting_time::Float64
+    finish_time::Float64
     job_state::JobState
     return_code
     profile_dict
-    allocation
+    allocation::IntervalSet
     metadata
 
-    Job(job_id, submit_time, walltime, res, profile) = new(job_id, submit_time, walltime, res, profile, nothing, nothing, SUBMITTED, nothing, nothing, nothing, nothing)
+    Job(job_id, submit_time, walltime, res, profile) = new(job_id, submit_time, walltime, res, profile, 0.0, 0.0, SUBMITTED, nothing, nothing, IntervalSet([]), nothing)
 end

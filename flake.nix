@@ -20,6 +20,8 @@
             # 
             julia-bin
             kap.batsim
+            kap.batsched
+            kap.batexpe
             zeromq
           ];
         };

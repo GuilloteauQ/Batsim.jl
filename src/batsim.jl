@@ -23,7 +23,7 @@ mutable struct Batsim
     # jobs::Dict
     # job_stats::JobStats
     socket::BatsimSocket
-    current_time    
+    current_time::Float64    
     simulation_is_running::Bool
     nb_resources
     profiles
@@ -46,7 +46,7 @@ function set_scheduler!(batsim, sched)
     batsim.scheduler = sched
 end
 
-function time(batsim)
+function time(batsim)::Float64
     batsim.current_time
 end
 
@@ -83,7 +83,8 @@ function next_event!(batsim)
 
     on_no_more_events!(batsim.scheduler)
 
-    data = Dict("now" => time(batsim), "events" => batsim.events_to_send)
+    # data = Dict("now" => time(batsim), "events" => batsim.events_to_send)
+    data = "{\"now\":$(time(batsim)),\"events\":[$(join(batsim.events_to_send, ","))]}"
     send_message(batsim.socket, data)  
 
     done_conversing
@@ -91,9 +92,9 @@ end
 
 function manage_event_notify!(batsim, data)
     # TODO
-    if data["type"] == "no_more_static_job_to_submit"
-        println("no more job to submit")
-    end
+    # if data["type"] == "no_more_static_job_to_submit"
+    #     # println("no more job to submit")
+    # end
 end
 
 function manage_event_job_complete!(batsim, data)
@@ -131,11 +132,12 @@ end
 
 function reject_jobs_by_ids!(batsim, job_ids)
     for job_id in job_ids
-        event = Dict(
-            "timestamp" => time(batsim),
-            "type" => "REJECT_JOB",
-            "data" => Dict("job_id" => job_id)
-        )
+        # event = Dict(
+        #     "timestamp" => time(batsim),
+        #     "type" => "REJECT_JOB",
+        #     "data" => Dict("job_id" => job_id)
+        # )
+        event = "{\"timestamp\":$(time(batsim)),\"type\":\"REJECT_JOB\",\"data\":{\"job_id\":\"$(job_id)\"}}"
         push!(batsim.events_to_send, event)
         # TODO change job state
     end
@@ -147,24 +149,23 @@ end
 
 
 
-function execute_job(batsim, job)
-    message = Dict(
-        "timestamp" => time(batsim),
-        "type" => "EXECUTE_JOB",
-        "data" => Dict(
-                "job_id" => job.job_id,
-                "alloc" => repr(job.allocation)
-        )
-    )
+function execute_job(batsim, job::Job)
+    alloc_repr = repr(job.allocation)
+    message = message_execute_job(batsim.current_time, job.job_id, alloc_repr)
 
     batsim.jobs[job.job_id].allocation = job.allocation
     batsim.jobs[job.job_id].job_state = RUNNING
-    batsim.jobs[job.job_id].starting_time = time(batsim)
+    batsim.jobs[job.job_id].starting_time = batsim.current_time
 
     push!(batsim.events_to_send, message)
 end
 
-function execute_jobs(batsim, jobs)
+function message_execute_job(time::Float64, job_id::String, alloc::String)::String
+    "{\"timestamp\":$(time),\"type\":\"EXECUTE_JOB\",\"data\":{\"job_id\":\"$(job_id)\",\"alloc\":\"$(alloc)\"}}"
+
+end
+
+function execute_jobs(batsim::Batsim, jobs::Vector{Job})
     for job in jobs
         execute_job(batsim, job)
     end
