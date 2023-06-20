@@ -17,7 +17,7 @@ function close_socket(socket)
   ZMQ.close(socket.socket)
 end
 
-function recv_message_string(socket)
+function recv_message_string(socket::BatsimSocket)::String
   ZMQ.recv(socket.socket, String)
 end
 

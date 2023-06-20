@@ -54,7 +54,7 @@ function get_inf(interval_set)
   end
 end
 
-function find_spots(interval_set::IntervalSet, desired_length)::IntervalSet
+function find_spots(interval_set::IntervalSet, desired_length::Int64)::IntervalSet
   if desired_length > length(interval_set)
     IntervalSet([])
   else
@@ -89,7 +89,7 @@ function flatten_iter(interval_set)
   map(x -> (get_inf(x), get_sup(x) + 1), interval_set.intervals) |> Iterators.flatten
 end
 
-function unflatten(point_list)
+function unflatten(point_list::Vector{})::IntervalSet
   IntervalSet(partition(point_list, 2) .|> x -> Interval(x[1], x[2]-1))
 end
 

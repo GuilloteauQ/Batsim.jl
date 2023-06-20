@@ -28,11 +28,11 @@ mutable struct Batsim
     nb_resources
     profiles
     workloads
-    jobs
+    jobs::Dict{String, Job}
     scheduler
     events_to_send
 
-    Batsim() = new(BatsimSocket(), 0.0, false, 0, nothing, nothing, nothing, nothing, [])
+    Batsim() = new(BatsimSocket(), 0.0, false, 0, nothing, nothing, Dict(), nothing, [])
 end
 
 get_nb_compute_resources(batsim) = batsim.nb_resources
@@ -61,9 +61,10 @@ end
 
 function next_event!(batsim)
     message = recv_message(batsim.socket)
-    batsim.current_time = message["now"]
     batsim.events_to_send = []
     done_conversing = false
+
+    batsim.current_time = message["now"]
     
     for event in message["events"]
         event_type = event["type"]
@@ -97,14 +98,14 @@ function manage_event_notify!(batsim, data)
     # end
 end
 
-function manage_event_job_complete!(batsim, data)
+function manage_event_job_complete!(batsim::Batsim, data::Dict{String, Any})
     job_id = data["job_id"]
     job = batsim.jobs[job_id]
-    job.finish_time = time(batsim)
+    job.finish_time = batsim.current_time
     on_job_completion!(batsim.scheduler, job)
 end
 
-function manage_event_job_submitted!(batsim, data)
+function manage_event_job_submitted!(batsim::Batsim, data::Dict{String, Any})
     job_id = data["job_id"]
     job_data = data["job"]
     new_job = Job(job_id, job_data["subtime"], job_data["walltime"], job_data["res"], job_data["profile"])
@@ -149,7 +150,7 @@ end
 
 
 
-function execute_job(batsim, job::Job)
+function execute_job(batsim::Batsim, job::Job)
     alloc_repr = repr(job.allocation)
     message = message_execute_job(batsim.current_time, job.job_id, alloc_repr)
 

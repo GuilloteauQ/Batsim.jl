@@ -1,7 +1,6 @@
 include("batsim.jl")
 include("schedulers/fcfs.jl")
 # using Profile
-# using Traceur
 # using ProfileSVG
 
 function main()
