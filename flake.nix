@@ -2,15 +2,21 @@
   description = "A very basic flake";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/23.05";
-    kapack.url = "github:oar-team/nur-kapack";
+    nixpkgs.url = "github:nixos/nixpkgs/23.11";
+    kapack.url = "github:oar-team/nur-kapack/add_aarch64_darwin_system";
   };
 
   outputs = { self, nixpkgs, kapack }:
     let
-      system = "x86_64-linux";
+      #system = "x86_64-linux";
+      system = "aarch64-darwin";
       pkgs = import nixpkgs { inherit system; };
-      kap = kapack.packages.${system};
+      #kap = kapack.packages.${system};
+      sg = pkgs.simgrid.overrideAttrs (finalAttrs: previousAttrs: {
+        doCheck = false;
+        meta.broken = false;
+      });
+      batsim = kapack.packages.${system}.batsim.override { simgrid = sg; };
     in
     {
 
@@ -19,9 +25,9 @@
           buildInputs = with pkgs; [
             # 
             julia-bin
-            kap.batsim
-            kap.batsched
-            kap.batexpe
+            batsim
+            #kap.batsched
+            #kap.batexpe
             zeromq
           ];
         };
